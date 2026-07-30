@@ -1,5 +1,9 @@
 # Пульсометр света / Light Pulse Meter
 
+<p align="center">
+  <img src="app/src/main/res/drawable-nodpi/app_icon.png" width="180" alt="Light Pulse Meter icon">
+</p>
+
 ## Русский
 
 **Пульсометр света** — автономное Android-приложение для ориентировочной
