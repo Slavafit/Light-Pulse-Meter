@@ -9,6 +9,7 @@ import android.os.Bundle
 import android.provider.Settings
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.compose.LocalActivityResultRegistryOwner
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
@@ -116,7 +117,11 @@ private fun App(viewModel: AppViewModel, activity: ComponentActivity) {
         }
     }
     val localeContext = remember(localeConfig, baseContext) { baseContext.createConfigurationContext(localeConfig) }
-    CompositionLocalProvider(LocalContext provides localeContext, LocalConfiguration provides localeConfig) {
+    CompositionLocalProvider(
+        LocalContext provides localeContext,
+        LocalConfiguration provides localeConfig,
+        LocalActivityResultRegistryOwner provides activity,
+    ) {
         MaterialTheme(colorScheme = if (dark) darkColorScheme() else lightColorScheme()) {
             AppNavigation(viewModel, value, activity)
         }
