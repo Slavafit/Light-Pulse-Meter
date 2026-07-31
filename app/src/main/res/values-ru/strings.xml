@@ -22,6 +22,7 @@
     <string name="movement">Обнаружено движение — удерживайте телефон неподвижно</string>
     <string name="ready">Готово к измерению</string>
     <string name="measuring">Измерение… %1$d%%</string>
+    <string name="automatic_start">Измерение начнётся автоматически при подходящем освещении</string>
     <string name="result_title">Результат измерения</string>
     <string name="frequency">Частота</string>
     <string name="modulation">Коэффициент пульсации</string>

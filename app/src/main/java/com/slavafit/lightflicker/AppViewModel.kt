@@ -59,6 +59,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         measuring.value = false
         result.value = null
         progress.value = 0f
+        latestSample.value = null
         samples.clear()
     }
 

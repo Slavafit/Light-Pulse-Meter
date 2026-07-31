@@ -84,6 +84,7 @@ import com.slavafit.lightflicker.measurement.Confidence
 import com.slavafit.lightflicker.measurement.LumaAnalyzer
 import com.slavafit.lightflicker.measurement.MeasurementResult
 import com.slavafit.lightflicker.measurement.ResultZone
+import kotlinx.coroutines.delay
 import java.util.Locale
 import java.util.concurrent.Executors
 
@@ -96,7 +97,7 @@ class MainActivity : ComponentActivity() {
     }
 }
 
-private enum class Screen { ONBOARDING, PERMISSION, HOME, GUIDE, CAMERA, RESULT, SETTINGS, ABOUT, UNDERSTAND }
+private enum class Screen { ONBOARDING, PERMISSION, HOME, GUIDE, CAMERA, RESULT, SETTINGS, UNDERSTAND }
 
 @Composable
 private fun App(viewModel: AppViewModel, activity: ComponentActivity) {
@@ -159,11 +160,9 @@ private fun AppNavigation(viewModel: AppViewModel, settings: AppSettings, activi
         Screen.SETTINGS -> SettingsScreen(
             settings = settings,
             viewModel = viewModel,
-            onAbout = { screen = Screen.ABOUT },
             onGuide = { screen = Screen.GUIDE },
             onBack = { screen = Screen.HOME },
         )
-        Screen.ABOUT -> AboutScreen { screen = Screen.SETTINGS }
         Screen.UNDERSTAND -> TextPage(R.string.understand_result, R.string.understand_body) { screen = Screen.RESULT }
     }
 }
@@ -229,8 +228,26 @@ private fun CameraScreen(viewModel: AppViewModel, onBack: () -> Unit) {
     val progress by viewModel.progress.collectAsState()
     val measuring by viewModel.measuring.collectAsState()
     var cameraError by remember { mutableStateOf(false) }
+    var autoStartTriggered by remember { mutableStateOf(false) }
     val analyzer = remember { LumaAnalyzer(viewModel::onFrame) }
     val executor = remember { Executors.newSingleThreadExecutor() }
+
+    LaunchedEffect(Unit) {
+        delay(1_000)
+        while (!autoStartTriggered) {
+            val current = viewModel.latestSample.value
+            val ready = current != null &&
+                current.brightness in 30.0..245.0 &&
+                current.saturatedRatio < 0.18 &&
+                current.motion <= 22.0
+            if (!cameraError && ready) {
+                autoStartTriggered = true
+                viewModel.startMeasurement()
+            } else {
+                delay(200)
+            }
+        }
+    }
 
     DisposableEffect(lifecycleOwner) {
         onDispose { executor.shutdown() }
@@ -285,16 +302,17 @@ private fun CameraScreen(viewModel: AppViewModel, onBack: () -> Unit) {
                 Text(stringResource(R.string.measuring, (progress * 100).toInt()), color = Color.White)
             }
         }
-        Row(
+        Column(
             Modifier.align(Alignment.BottomCenter).fillMaxWidth().background(Color.Black.copy(alpha = 0.6f)).padding(18.dp),
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            OutlinedButton(onClick = onBack, modifier = Modifier.weight(1f).height(52.dp)) { Text(stringResource(R.string.back), color = Color.White) }
-            Button(
-                onClick = viewModel::startMeasurement,
-                enabled = !measuring && !cameraError && sample?.let { it.brightness in 30.0..245.0 && it.saturatedRatio < 0.18 } == true,
-                modifier = Modifier.weight(2f).height(52.dp),
-            ) { Text(stringResource(R.string.start_measurement)) }
+            if (!measuring) {
+                Text(stringResource(R.string.automatic_start), color = Color.White, textAlign = TextAlign.Center)
+                Spacer(Modifier.height(8.dp))
+            }
+            OutlinedButton(onClick = onBack, modifier = Modifier.fillMaxWidth().height(52.dp)) {
+                Text(stringResource(R.string.back), color = Color.White)
+            }
         }
     }
 }
@@ -380,24 +398,54 @@ private fun ResultScale(zone: ResultZone) {
 private fun SettingsScreen(
     settings: AppSettings,
     viewModel: AppViewModel,
-    onAbout: () -> Unit,
     onGuide: () -> Unit,
     onBack: () -> Unit,
-) = Scaffold(topBar = { TopAppBar(title = { Text(stringResource(R.string.settings)) }, navigationIcon = { TextButton(onClick = onBack) { Text(stringResource(R.string.back)) } }) }) { padding ->
-    Column(Modifier.padding(padding).verticalScroll(rememberScrollState()).padding(20.dp)) {
-        Text(stringResource(R.string.language), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-        Choice("", R.string.system_language, settings.language.isBlank(), viewModel::setLanguage)
-        Choice("en", R.string.english, settings.language == "en", viewModel::setLanguage)
-        Choice("ru", R.string.russian, settings.language == "ru", viewModel::setLanguage)
-        Choice("es", R.string.spanish, settings.language == "es", viewModel::setLanguage)
-        Spacer(Modifier.height(20.dp))
-        Text(stringResource(R.string.theme), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-        ThemeChoice(ThemeMode.SYSTEM, R.string.system_theme, settings.theme, viewModel::setTheme)
-        ThemeChoice(ThemeMode.LIGHT, R.string.light_theme, settings.theme, viewModel::setTheme)
-        ThemeChoice(ThemeMode.DARK, R.string.dark_theme, settings.theme, viewModel::setTheme)
-        Spacer(Modifier.height(20.dp))
-        OutlinedButton(onClick = onGuide, modifier = Modifier.fillMaxWidth().height(52.dp)) { Text(stringResource(R.string.instructions)) }
-        OutlinedButton(onClick = onAbout, modifier = Modifier.fillMaxWidth().height(52.dp)) { Text(stringResource(R.string.about)) }
+) {
+    val context = LocalContext.current
+    var linkError by remember { mutableStateOf(false) }
+    Scaffold(topBar = { TopAppBar(title = { Text(stringResource(R.string.settings)) }, navigationIcon = { TextButton(onClick = onBack) { Text(stringResource(R.string.back)) } }) }) { padding ->
+        Column(Modifier.padding(padding).verticalScroll(rememberScrollState()).padding(20.dp)) {
+            Text(stringResource(R.string.language), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+            Choice("", R.string.system_language, settings.language.isBlank(), viewModel::setLanguage)
+            Choice("en", R.string.english, settings.language == "en", viewModel::setLanguage)
+            Choice("ru", R.string.russian, settings.language == "ru", viewModel::setLanguage)
+            Choice("es", R.string.spanish, settings.language == "es", viewModel::setLanguage)
+            Spacer(Modifier.height(20.dp))
+            Text(stringResource(R.string.theme), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+            ThemeChoice(ThemeMode.SYSTEM, R.string.system_theme, settings.theme, viewModel::setTheme)
+            ThemeChoice(ThemeMode.LIGHT, R.string.light_theme, settings.theme, viewModel::setTheme)
+            ThemeChoice(ThemeMode.DARK, R.string.dark_theme, settings.theme, viewModel::setTheme)
+            Spacer(Modifier.height(20.dp))
+            OutlinedButton(onClick = onGuide, modifier = Modifier.fillMaxWidth().height(52.dp)) { Text(stringResource(R.string.instructions)) }
+
+            Spacer(Modifier.height(28.dp))
+            Text(stringResource(R.string.about), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+            Spacer(Modifier.height(16.dp))
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Logo()
+                Spacer(Modifier.width(16.dp))
+                Column {
+                    Text(stringResource(R.string.app_name), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                    Text(stringResource(R.string.version, BuildConfig.VERSION_NAME), style = MaterialTheme.typography.bodyMedium)
+                }
+            }
+            Spacer(Modifier.height(16.dp))
+            Text(stringResource(R.string.about_purpose))
+            Spacer(Modifier.height(12.dp))
+            Text(stringResource(R.string.developer), fontWeight = FontWeight.SemiBold)
+            TextButton(onClick = {
+                try {
+                    context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://t.me/Slavafit")))
+                } catch (_: ActivityNotFoundException) {
+                    linkError = true
+                }
+            }, modifier = Modifier.height(48.dp)) { Text(stringResource(R.string.telegram)) }
+            if (linkError) Text(stringResource(R.string.link_error), color = MaterialTheme.colorScheme.error)
+            Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) {
+                Text(stringResource(R.string.disclaimer), Modifier.padding(16.dp))
+            }
+            Spacer(Modifier.height(20.dp))
+        }
     }
 }
 
@@ -414,35 +462,6 @@ private fun ThemeChoice(value: ThemeMode, label: Int, selected: ThemeMode, actio
         RadioButton(selected = selected == value, onClick = { action(value) })
         TextButton(onClick = { action(value) }) { Text(stringResource(label)) }
     }
-
-@Composable
-private fun AboutScreen(onBack: () -> Unit) {
-    val context = LocalContext.current
-    var linkError by remember { mutableStateOf(false) }
-    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-        TextButton(onClick = onBack, modifier = Modifier.align(Alignment.Start).height(48.dp)) { Text(stringResource(R.string.back)) }
-        Logo()
-        Spacer(Modifier.height(16.dp))
-        Text(stringResource(R.string.app_name), style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
-        Text(stringResource(R.string.version, BuildConfig.VERSION_NAME))
-        Spacer(Modifier.height(18.dp))
-        Text(stringResource(R.string.about_purpose), textAlign = TextAlign.Center)
-        Spacer(Modifier.height(16.dp))
-        Text(stringResource(R.string.developer), fontWeight = FontWeight.SemiBold)
-        TextButton(onClick = {
-            try {
-                context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://t.me/Slavafit")))
-            } catch (_: ActivityNotFoundException) {
-                linkError = true
-            }
-        }, modifier = Modifier.height(48.dp)) { Text(stringResource(R.string.telegram)) }
-        if (linkError) Text(stringResource(R.string.link_error), color = MaterialTheme.colorScheme.error)
-        Spacer(Modifier.height(18.dp))
-        Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) {
-            Text(stringResource(R.string.disclaimer), Modifier.padding(16.dp), textAlign = TextAlign.Center)
-        }
-    }
-}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable

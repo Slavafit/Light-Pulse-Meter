@@ -22,6 +22,7 @@
     <string name="movement">Movimiento detectado — mantén el teléfono inmóvil</string>
     <string name="ready">Listo para medir</string>
     <string name="measuring">Midiendo… %1$d%%</string>
+    <string name="automatic_start">La medición comenzará automáticamente cuando la iluminación sea adecuada</string>
     <string name="result_title">Resultado</string>
     <string name="frequency">Frecuencia</string>
     <string name="modulation">Coeficiente de parpadeo</string>

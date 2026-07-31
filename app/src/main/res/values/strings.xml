@@ -22,6 +22,7 @@
     <string name="movement">Movement detected — keep the phone still</string>
     <string name="ready">Ready to measure</string>
     <string name="measuring">Measuring… %1$d%%</string>
+    <string name="automatic_start">Measurement will start automatically when the lighting is suitable</string>
     <string name="result_title">Measurement result</string>
     <string name="frequency">Frequency</string>
     <string name="modulation">Flicker coefficient</string>
