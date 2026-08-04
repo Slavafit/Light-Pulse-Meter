@@ -8,6 +8,7 @@ import android.net.Uri
 import android.os.Bundle
 import android.provider.Settings
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.LocalActivityResultRegistryOwner
 import androidx.activity.compose.setContent
@@ -137,6 +138,7 @@ private fun AppNavigation(viewModel: AppViewModel, settings: AppSettings, activi
     }
     val result by viewModel.result.collectAsState()
     LaunchedEffect(result) { if (result != null && screen == Screen.CAMERA) screen = Screen.RESULT }
+    BackHandler(enabled = screen == Screen.SETTINGS) { screen = Screen.HOME }
 
     when (screen) {
         Screen.ONBOARDING -> Onboarding {
